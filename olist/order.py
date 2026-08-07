@@ -94,7 +94,45 @@ class Order:
         Returns a DataFrame with:
         order_id, distance_seller_customer
         """
-        pass  # YOUR CODE HERE
+        data = self.data
+
+        # Posta kodu başına tek koordinat
+        geo = data['geolocation'].copy()
+        geo_unique = (geo.groupby('geolocation_zip_code_prefix', as_index=False)
+                      .agg({'geolocation_lat': 'mean',
+                            'geolocation_lng': 'mean'}))
+
+        # Satıcı koordinatları (kalem düzeyinde)
+        sellers_geo = (data['order_items'][['order_id', 'seller_id']]
+                       .merge(data['sellers'], on='seller_id')
+                       .merge(geo_unique,
+                              left_on='seller_zip_code_prefix',
+                              right_on='geolocation_zip_code_prefix'))
+
+        # Müşteri koordinatları (sipariş düzeyinde)
+        customers_geo = (data['orders'][['order_id', 'customer_id']]
+                         .merge(data['customers'], on='customer_id')
+                         .merge(geo_unique,
+                                left_on='customer_zip_code_prefix',
+                                right_on='geolocation_zip_code_prefix'))
+
+        # İki tarafı buluştur
+        matching_geo = sellers_geo.merge(customers_geo,
+                                         on='order_id',
+                                         suffixes=('_seller', '_customer'))
+
+        # Satır satır haversine mesafesi
+        matching_geo['distance_seller_customer'] = matching_geo.apply(
+            lambda row: haversine_distance(row['geolocation_lat_seller'],
+                                           row['geolocation_lng_seller'],
+                                           row['geolocation_lat_customer'],
+                                           row['geolocation_lng_customer']),
+            axis=1)
+
+        # Kalem düzeyi → sipariş düzeyi (ortalama)
+        return (matching_geo
+                .groupby('order_id', as_index=False)
+                .agg({'distance_seller_customer': 'mean'}))
 
     def get_training_data(self,
                           is_delivered=True,
@@ -113,4 +151,5 @@ class Order:
                     .merge(self.get_number_sellers(), on='order_id')
                     .merge(self.get_price_and_freight(), on='order_id')
                     )
+        
         return training.dropna()
