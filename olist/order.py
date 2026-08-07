@@ -20,7 +20,34 @@ class Order:
         and filters out non-delivered orders unless specified
         """
         # Hint: Within this instance method, you have access to the instance of the class Order in the variable self, as well as all its attributes
-        pass  # YOUR CODE HERE
+        orders = self.data['orders'].copy()
+
+        if is_delivered:
+            orders = orders[orders['order_status'] == 'delivered'].copy()
+
+        orders['order_purchase_timestamp'] = pd.to_datetime(orders['order_purchase_timestamp'])
+        orders['order_approved_at'] = pd.to_datetime(orders['order_approved_at'])
+        orders['order_delivered_customer_date'] = pd.to_datetime(orders['order_delivered_customer_date'])
+        orders['order_estimated_delivery_date'] = pd.to_datetime(orders['order_estimated_delivery_date'])
+        orders['order_delivered_carrier_date'] = pd.to_datetime(orders['order_delivered_carrier_date'])
+
+        one_day = pd.Timedelta(1, 'D')
+
+        # wait_time: gerçek teslim - satın alma
+
+        orders['wait_time'] = (orders['order_delivered_customer_date'] - orders['order_purchase_timestamp']) / one_day
+
+        # expected_wait_time: tahmini teslim - satın alma
+
+        orders['expected_wait_time'] = (orders['order_estimated_delivery_date'] - orders['order_purchase_timestamp']) / one_day
+
+
+        # delay_vs_expected: gerçek teslim - tahmini teslim, sonra negatifleri 0'la
+
+        orders['delay_vs_expected'] = ((orders['order_delivered_customer_date'] - orders['order_estimated_delivery_date']) / one_day).clip(lower=0)
+
+        return orders[['order_id', 'wait_time', 'expected_wait_time',
+                   'delay_vs_expected', 'order_status']]
 
     def get_review_score(self):
         """
@@ -59,7 +86,7 @@ class Order:
         pass  # YOUR CODE HERE
 
     def get_training_data(self,
-                          is_delivered=True,
+                          is_orders=True,
                           with_distance_seller_customer=False):
         """
         Returns a clean DataFrame (without NaN), with the all following columns:
