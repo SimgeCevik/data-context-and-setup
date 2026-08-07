@@ -97,7 +97,7 @@ class Order:
         pass  # YOUR CODE HERE
 
     def get_training_data(self,
-                          is_orders=True,
+                          is_delivered=True,
                           with_distance_seller_customer=False):
         """
         Returns a clean DataFrame (without NaN), with the all following columns:
@@ -107,4 +107,10 @@ class Order:
         'distance_seller_customer']
         """
         # Hint: make sure to re-use your instance methods defined above
-        pass  # YOUR CODE HERE
+        training = (self.get_wait_time(is_delivered)
+                    .merge(self.get_review_score(), on='order_id')
+                    .merge(self.get_number_items(), on='order_id')
+                    .merge(self.get_number_sellers(), on='order_id')
+                    .merge(self.get_price_and_freight(), on='order_id')
+                    )
+        return training.dropna()
